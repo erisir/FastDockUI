@@ -169,39 +169,105 @@ public class IFastDock implements PlugIn {
         }
     }
 
-    public boolean getRecordInfo(int dataNumber) {
-        // Assuming PDC_RECORD_INFO is mapped as a JNA Structure
-        PDC_RECORD_INFO recordInfo = new PDC_RECORD_INFO();
-        IntByReference nErrorCode = new IntByReference(0);
-
-        /*
-         * int result = PDCLib.INSTANCE.PFDC_GetRecordInfo(dataNumber, recordInfo,
-         * nErrorCode);
-         * if (result == 0) { // Assuming 0 indicates failure
-         * System.err.printf("PFDC_GetRecordInfo() Failed for data %d. ErrorCode = %d\n"
-         * , dataNumber, nErrorCode.getValue());
-         * return false;
-         * }
-         * 
-         * // Extract and display information from the recordInfo structure
-         * System.out.println("Data Name        : " + recordInfo.dataName);
-         * System.out.printf("Date Time        : %02x/%02x/%02x %02x:%02x:%02x\n",
-         * (recordInfo.date >> 16) & 0xFF,
-         * (recordInfo.date >> 8) & 0xFF,
-         * recordInfo.date & 0xFF,
-         * (recordInfo.time >> 16) & 0xFF,
-         * (recordInfo.time >> 8) & 0xFF,
-         * recordInfo.time & 0xFF);
-         * System.out.println("Total Frames     : " + recordInfo.totalFrames);
-         * System.out.printf("Image Resolution : %dx%d\n", recordInfo.width,
-         * recordInfo.height);
-         * System.out.println("Record Rate      : " + recordInfo.recordRate + "fps");
-         * System.out.println("Shutter Speed    : 1/" + recordInfo.shutterSpeed +
-         * "sec");
-         * System.out.println("Trigger Mode     : " + recordInfo.triggerMode);
-         * System.out.println("Color Bits       : " + recordInfo.colorBits);
-         * System.out.println("Color Type       : " + recordInfo.colorType);
-         */
+    public void getRecordInfo(unsigned long dataNumber) {
+        PDC_RECORD_INFO recordInfo;
+        unsigned long nErrorCode;
+    
+        if (PFDC_GetRecordInfo(dataNumber, &recordInfo, &nErrorCode) == PDC_FAILED) {
+            printf("PFDC_GetRecordInfo() Failed for data %lu. ErrorCode = %lu\n", dataNumber, nErrorCode);
+            return false;
+        }
+    
+        printf("Data Name             : %s\n", recordInfo.m_pDataName);
+        printf("Device Name           : %s\n", recordInfo.m_DeviceName);
+        printf("Info Version          : %u\n", recordInfo.m_nInfoVersion);
+        printf("Sys Version           : %u\n", recordInfo.m_nSysVersion);
+        printf("Date                  : %02x/%02x/%02x\n",
+               (recordInfo.m_nDate >> 16) & 0xFF,
+               (recordInfo.m_nDate >> 8) & 0xFF,
+               recordInfo.m_nDate & 0xFF);
+        printf("Time                  : %02x:%02x:%02x\n",
+               (recordInfo.m_nTime >> 16) & 0xFF,
+               (recordInfo.m_nTime >> 8) & 0xFF,
+               recordInfo.m_nTime & 0xFF);
+        printf("Camera Type           : %lu\n", recordInfo.m_nCameraType);
+        printf("Head Type             : %u\n", recordInfo.m_nHeadType);
+        printf("Head Number           : %u\n", recordInfo.m_nHeadNo);
+        printf("Max Head Number       : %u\n", recordInfo.m_nMaxHeadNum);
+        printf("Record Rate           : %lu fps\n", recordInfo.m_nRecordRate);
+        printf("Shutter Speed         : 1/%lu sec\n", recordInfo.m_nShutterSpeed);
+        printf("Trigger Mode          : %lu\n", recordInfo.m_nTriggerMode);
+        printf("Manual Frames         : %lu\n", recordInfo.m_nManualFrames);
+        printf("Random Frames         : %lu\n", recordInfo.m_nRandomFrames);
+        printf("Random Manual Frames  : %lu\n", recordInfo.m_nRandomManualFrames);
+        printf("Random Times          : %lu\n", recordInfo.m_nRandomTimes);
+        printf("Two Stage Type        : %lu\n", recordInfo.m_nTwoStageType);
+        printf("Two Stage LH Frame    : %lu\n", recordInfo.m_nTwoStageLHFrame);
+        printf("Two Stage Cycle       : %lu\n", recordInfo.m_nTwoStageCycle);
+        printf("Two Stage HL Frame    : %lu\n", recordInfo.m_nTwoStageHLFrame);
+        printf("Color Temperature     : %u\n", recordInfo.m_nColorTemperature);
+        printf("Color Balance (R, G, B) : %u, %u, %u\n", recordInfo.m_nColorBalanceR, recordInfo.m_nColorBalanceG, recordInfo.m_nColorBalanceB);
+        printf("Color Balance Base    : %u\n", recordInfo.m_nColorBalanceBase);
+        printf("Color Balance Max     : %u\n", recordInfo.m_nColorBalanceMax);
+        printf("Original Total Frames : %lu\n", recordInfo.m_nOriginalTotalFrames);
+        printf("Total Frames          : %lu\n", recordInfo.m_nTotalFrames);
+        printf("Start Frame           : %ld\n", recordInfo.m_nStartFrame);
+        printf("Trigger Frame         : %ld\n", recordInfo.m_nTriggerFrame);
+        printf("Number of Events      : %lu\n", recordInfo.m_nNumOfEvent);
+        
+        // Display events
+        for (unsigned long i = 0; i < recordInfo.m_nNumOfEvent && i < 10; ++i) {
+            printf("Event %lu               : %ld\n", i, recordInfo.m_nEvent[i]);
+        }
+    
+        printf("Resolution            : %dx%d\n", recordInfo.m_nWidth, recordInfo.m_nHeight);
+        printf("Sensor Position (X, Y): %u, %u\n", recordInfo.m_nSensorPosX, recordInfo.m_nSensorPosY);
+        printf("Sensor Size (Width x Height): %u x %u\n", recordInfo.m_nSensorWidth, recordInfo.m_nSensorHeight);
+        printf("Color Type            : %u\n", recordInfo.m_nColorType);
+        printf("Color Bits            : %u\n", recordInfo.m_nColorBits);
+        printf("Effective Bit Depth   : %u\n", recordInfo.m_nEffectiveBitDepth);
+        printf("Effective Bit Side    : %u\n", recordInfo.m_nEffectiveBitSide);
+        printf("IRIG Mode             : %lu\n", recordInfo.m_nIRIGMode);
+        printf("Shutter Type 2        : %lu\n", recordInfo.m_nShutterType2);
+        
+        // Color Matrix (RR, RG, RB, GR, GG, GB, BR, BG, BB)
+        printf("Color Matrix (RR, RG, RB, GR, GG, GB, BR, BG, BB): ");
+        printf("%d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+               recordInfo.m_nColorMatrixRR, recordInfo.m_nColorMatrixRG, recordInfo.m_nColorMatrixRB,
+               recordInfo.m_nColorMatrixGR, recordInfo.m_nColorMatrixGG, recordInfo.m_nColorMatrixGB,
+               recordInfo.m_nColorMatrixBR, recordInfo.m_nColorMatrixBG, recordInfo.m_nColorMatrixBB);
+    
+        printf("LUT Bits             : %u\n", recordInfo.m_nLUTBits);
+        printf("Color Enhance        : %u\n", recordInfo.m_nColorEnhance);
+        printf("Edge Enhance         : %u\n", recordInfo.m_nEdgeEnhance);
+        printf("LUT Mode             : %lu\n", recordInfo.m_nLUTMode);
+        printf("DS Shutter           : %u\n", recordInfo.m_nDSShutter);
+        printf("Polarization         : %u\n", recordInfo.m_nPolarization);
+        printf("Polarizer Config     : %u\n", recordInfo.m_nPolarizerConfig);
+        printf("Digits of File Number: %u\n", recordInfo.m_nDigitsOfFileNumber);
+        printf("Pixel Gain Base      : %u\n", recordInfo.m_nPixelGainBase);
+        printf("Pixel Gain Bits      : %u\n", recordInfo.m_nPixelGainBits);
+        printf("Shading Bits         : %u\n", recordInfo.m_nShadingBits);
+        printf("Bayer Pattern        : %u\n", recordInfo.m_nBayerPattern);
+        printf("Expose Time Number   : %u\n", recordInfo.m_nExposeTimeNum);
+        printf("Rec On Cmd Times     : %u\n", recordInfo.m_nRecOnCmdTimes);
+        printf("Pixel Gain Param     : %u\n", recordInfo.m_nPixelGainParam);
+        printf("Reserve              : %u\n", recordInfo.m_nReserve);
+        printf("Irig Sample          : %lu\n", recordInfo.m_IrigSample);
+        printf("AE Exposure Time Mode: %lu\n", recordInfo.m_AEExposureTimeRecordMode);
+        printf("AE Mode Set          : %u\n", recordInfo.m_AEModeSet);
+        printf("DAQ Mode            : %u\n", recordInfo.m_nDAQMode);
+        printf("DAQ Range            : [%lu, %lu]\n", recordInfo.m_nDAQRange[0], recordInfo.m_nDAQRange[1]);
+        printf("Irig Offset          : %ld\n", recordInfo.m_IrigOffset);
+        printf("Serial Number        : %llu\n", recordInfo.m_nSerialNumber);
+        printf("Data Number          : %lu\n", recordInfo.m_nDataNumber);
+        printf("Is Over Sync         : %lu\n", recordInfo.m_nIsOverSync);
+        printf("External Others Mode : %u\n", recordInfo.m_nExtOthersMode);
+        printf("Reserve 2            : %u\n", recordInfo.m_nReserve2);
+        printf("Temperature Type     : %lu\n", recordInfo.m_nTemperatureType);
+        printf("Acceleration Type    : %lu\n", recordInfo.m_nAccelerationType);
+        printf("Pixel Gain Data Size : %lu\n", recordInfo.m_nPixelGainDataSize);
+    
         return true;
     }
 
