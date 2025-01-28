@@ -171,7 +171,7 @@ public class IFastDock implements PlugIn {
 
     public void getRecordInfo(unsigned long dataNumber) {
         PDC_RECORD_INFO recordInfo;
-        unsigned long nErrorCode;
+        /*unsigned long nErrorCode;
     
         if (PFDC_GetRecordInfo(dataNumber, &recordInfo, &nErrorCode) == PDC_FAILED) {
             printf("PFDC_GetRecordInfo() Failed for data %lu. ErrorCode = %lu\n", dataNumber, nErrorCode);
@@ -269,7 +269,7 @@ public class IFastDock implements PlugIn {
         printf("Pixel Gain Data Size : %lu\n", recordInfo.m_nPixelGainDataSize);
     
         return true;
-    }
+    }*/
 
     public void showVirtualStack(int dataNumber,int width,int height,int totalFrames) {
         // Parameters for the images
