@@ -1,3 +1,9 @@
+/* IFastDockUI for reading data from Protron Fastdock
+ * 1,Auto detect fastdock and select the first drive
+ * 2,Auto load record data in the first drive
+ * 3,Display the selected record data in imagej/fiji using virtual stack 
+ * Daguan Nong n.daguan@gmail.com 2025/01/18 
+ */
 import ij.plugin.frame.PlugInFrame;
 import javax.swing.*;
 import java.awt.*;
@@ -35,11 +41,15 @@ public class IFastDockUI extends PlugInFrame {
     JLabel driveNameLabel = null;
     JLabel activityRatioLabel = null;
     JLabel totalWrittenLabel = null;
+    // List and container
     JList<String> dataList = null;
     JList<String> driveList = null;
-    // List
     DefaultListModel<String> dataListModel = null;
     DefaultListModel<String> driveListModel = null;
+    //input
+    JTextField widthField = null;
+    JTextField heightField = null;
+    JTextField totalFrameField = null;
     // FastDock
     private IntByReference nErrorCode = new IntByReference(0);
     private IntByReference nDrives = new IntByReference(0);
@@ -52,7 +62,7 @@ public class IFastDockUI extends PlugInFrame {
     }
 
     public IFastDockUI() {
-        super("Drive Data Viewer");
+        super("FastDock Data Viewer");
         // FastDock
         initializeFastDock();
         InitializeUI();
@@ -70,34 +80,35 @@ public class IFastDockUI extends PlugInFrame {
 
     public void InitializeUI() {
         // Main Frame
-        mainFrame = new JFrame("Drive Data Viewer");
+        mainFrame = new JFrame("FastDock Data Viewer");
         mainFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        mainFrame.setSize(600, 500);
+        mainFrame.setSize(650, 500);
         mainFrame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
                 cleanup();
             }
         });
-        // Panel Layout
+    
+        // Main Panel with BorderLayout
         JPanel mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(2, 1));
-
+        mainPanel.setLayout(new BorderLayout());
+    
         // Upper Panel (Drive Selection and Info)
         JPanel upperPanel = new JPanel();
         upperPanel.setLayout(new GridLayout(1, 2));
-
+    
         // Drive List
         JPanel driveListPanel = new JPanel();
         driveListPanel.setLayout(new BorderLayout());
         JLabel driveListLabel = new JLabel("Valid Drives:");
         driveListModel = new DefaultListModel<>();
-
+    
         driveList = new JList<>(driveListModel);
         JScrollPane driveScrollPane = new JScrollPane(driveList);
         driveListPanel.add(driveListLabel, BorderLayout.NORTH);
         driveListPanel.add(driveScrollPane, BorderLayout.CENTER);
-
+    
         // Drive Info
         JPanel driveInfoPanel = new JPanel();
         driveInfoPanel.setLayout(new GridLayout(3, 1));
@@ -107,14 +118,14 @@ public class IFastDockUI extends PlugInFrame {
         driveInfoPanel.add(driveNameLabel);
         driveInfoPanel.add(activityRatioLabel);
         driveInfoPanel.add(totalWrittenLabel);
-
+    
         upperPanel.add(driveListPanel);
         upperPanel.add(driveInfoPanel);
-
+    
         // Lower Panel (Data List and Details)
         JPanel lowerPanel = new JPanel();
         lowerPanel.setLayout(new GridLayout(1, 2));
-
+    
         // Data List
         JPanel dataListPanel = new JPanel();
         dataListPanel.setLayout(new BorderLayout());
@@ -125,16 +136,16 @@ public class IFastDockUI extends PlugInFrame {
         JScrollPane dataScrollPane = new JScrollPane(dataList);
         dataListPanel.add(dataListLabel, BorderLayout.NORTH);
         dataListPanel.add(dataScrollPane, BorderLayout.CENTER);
-
+    
         // Details
         JPanel dataDetailsPanel = new JPanel();
         dataDetailsPanel.setLayout(new BorderLayout());
-
+    
         JLabel detailsListLabel = new JLabel("Data Info:");
         // Data Info
         JPanel dataInfoPanel = new JPanel();
         dataInfoPanel.setLayout(new GridLayout(7, 1));
-
+    
         deviceNameLabel = new JLabel("");
         dataNameLabel = new JLabel("");
         dataRecordTimeLabel = new JLabel("");
@@ -142,7 +153,7 @@ public class IFastDockUI extends PlugInFrame {
         dataShutterSpeedLabel = new JLabel("");
         dataResolutionLabel = new JLabel("");
         sensorSizeLabel = new JLabel("");
-
+    
         dataInfoPanel.add(deviceNameLabel);
         dataInfoPanel.add(dataNameLabel);
         dataInfoPanel.add(dataRecordTimeLabel);
@@ -150,61 +161,62 @@ public class IFastDockUI extends PlugInFrame {
         dataInfoPanel.add(dataShutterSpeedLabel);
         dataInfoPanel.add(dataResolutionLabel);
         dataInfoPanel.add(sensorSizeLabel);
-
+    
         dataDetailsPanel.add(detailsListLabel, BorderLayout.NORTH);
         dataDetailsPanel.add(dataInfoPanel, BorderLayout.CENTER);
-
+    
         lowerPanel.add(dataListPanel);
         lowerPanel.add(dataDetailsPanel);
+    
+        // Set preferred sizes for panels
+        upperPanel.setPreferredSize(new Dimension(mainFrame.getWidth(), mainFrame.getHeight() / 6));
+        lowerPanel.setPreferredSize(new Dimension(mainFrame.getWidth(), (mainFrame.getHeight() * 3) / 6));
+    
+        // Add a separator between upperPanel and lowerPanel
+        JSeparator separator = new JSeparator(SwingConstants.HORIZONTAL);
 
+        // Add panels to the main panel
+        mainPanel.add(upperPanel, BorderLayout.NORTH);
+        mainPanel.add(separator, BorderLayout.CENTER); // Separator between panels
+        mainPanel.add(lowerPanel, BorderLayout.SOUTH);
+    
         // Input Panel (Image Dimension Inputs)
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new GridLayout(4, 2));
         JLabel widthLabel = new JLabel("Width:");
-        JTextField widthField = new JTextField();
+        widthField = new JTextField();
         JLabel heightLabel = new JLabel("Height:");
-        JTextField heightField = new JTextField();
+        heightField = new JTextField();
         JLabel frameLabel = new JLabel("Total Frames:");
-        JTextField frameField = new JTextField();
+        totalFrameField = new JTextField();
         JButton submitButton = new JButton("Create Virtual Stack");
-
+    
         inputPanel.add(widthLabel);
         inputPanel.add(widthField);
         inputPanel.add(heightLabel);
         inputPanel.add(heightField);
         inputPanel.add(frameLabel);
-        inputPanel.add(frameField);
+        inputPanel.add(totalFrameField);
         inputPanel.add(new JLabel()); // Empty space
         inputPanel.add(submitButton);
-
-        mainPanel.add(upperPanel);
-        mainPanel.add(lowerPanel);
-
+    
         mainFrame.add(mainPanel, BorderLayout.CENTER);
         mainFrame.add(inputPanel, BorderLayout.SOUTH);
-
+    
         mainFrame.setVisible(true);
-
+    
         // Listeners
-        driveList.addListSelectionListener(e -> {
-            OnDriveListClick();
-        });
-
-        dataList.addListSelectionListener(e -> {
-            OnDataListClick();
-        });
-
-        submitButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int width = Integer.parseInt(widthField.getText());
-                int height = Integer.parseInt(heightField.getText());
-                int frames = Integer.parseInt(frameField.getText());
-                showVirtualStack(dataList.getSelectedIndex(), width, height, frames);
-            }
+        driveList.addListSelectionListener(e -> OnDriveListClick());
+        dataList.addListSelectionListener(e -> OnDataListClick());
+    
+        submitButton.addActionListener(e -> {
+            int width = Integer.parseInt(widthField.getText());
+            int height = Integer.parseInt(heightField.getText());
+            int frames = Integer.parseInt(totalFrameField.getText());
+            showVirtualStack(dataList.getSelectedIndex(), width, height, frames);
         });
     }
-
+    
     // show record info details on click event
     public void OnDataListClick() {
         String selectedData = dataList.getSelectedValue();
@@ -219,6 +231,10 @@ public class IFastDockUI extends PlugInFrame {
                 dataShutterSpeedLabel.setText("Record Shutter Speed  " + recordInfo.getShutterSpeed());
                 dataResolutionLabel.setText("Resolution  " + recordInfo.getResolution());
                 sensorSizeLabel.setText("Sensor Size  " + recordInfo.getSensorSize());
+                //auto set up the resolution in the input
+                widthField.setText(String.format("%d",recordInfo.m_nWidth));
+                heightField.setText(String.format("%d",recordInfo.m_nHeight));
+                totalFrameField.setText(String.format("%d",recordInfo.m_nTotalFrames));
             }
 
         }
