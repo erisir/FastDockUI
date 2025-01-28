@@ -37,19 +37,38 @@ public class IFastDockUI extends PlugInFrame {
     JLabel totalWrittenLabel = null;
     JList<String> dataList = null;
     JList<String> driveList = null;
+    // List
     DefaultListModel<String> dataListModel = null;
+    DefaultListModel<String> driveListModel = null;
+    // FastDock
+    private IntByReference nErrorCode = new IntByReference(0);
+    private IntByReference nDrives = new IntByReference(0);
+    private IntByReference nNumOfData = new IntByReference(0);
+    int m_nDataNumber = 0;
 
     public void cleanup() {
         // Custom cleanup logic before the frame is closed
         closeDrive();
-
     }
 
     public IFastDockUI() {
         super("Drive Data Viewer");
         // FastDock
-        initialize();
+        initializeFastDock();
+        InitializeUI();
+        // Update drive list
         int validDrivesNum = getValidDrives();
+        if (validDrivesNum > 0) {
+            for (int i = 0; i < validDrivesNum; i++) {
+                driveListModel.addElement(getDriveName(i));
+            }
+            // select and open the first drive
+            m_nDataNumber = openDrive(0);
+            driveList.setSelectedIndex(0);
+        }
+    }
+
+    public void InitializeUI() {
         // Main Frame
         mainFrame = new JFrame("Drive Data Viewer");
         mainFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -72,10 +91,7 @@ public class IFastDockUI extends PlugInFrame {
         JPanel driveListPanel = new JPanel();
         driveListPanel.setLayout(new BorderLayout());
         JLabel driveListLabel = new JLabel("Valid Drives:");
-        DefaultListModel<String> driveListModel = new DefaultListModel<>();
-        for (int i = 0; i < validDrivesNum; i++) {
-            driveListModel.addElement(getDriveName(i));
-        }
+        driveListModel = new DefaultListModel<>();
 
         driveList = new JList<>(driveListModel);
         JScrollPane driveScrollPane = new JScrollPane(driveList);
@@ -94,7 +110,7 @@ public class IFastDockUI extends PlugInFrame {
 
         upperPanel.add(driveListPanel);
         upperPanel.add(driveInfoPanel);
-  
+
         // Lower Panel (Data List and Details)
         JPanel lowerPanel = new JPanel();
         lowerPanel.setLayout(new GridLayout(1, 2));
@@ -109,11 +125,11 @@ public class IFastDockUI extends PlugInFrame {
         JScrollPane dataScrollPane = new JScrollPane(dataList);
         dataListPanel.add(dataListLabel, BorderLayout.NORTH);
         dataListPanel.add(dataScrollPane, BorderLayout.CENTER);
-        
+
         // Details
         JPanel dataDetailsPanel = new JPanel();
         dataDetailsPanel.setLayout(new BorderLayout());
-        
+
         JLabel detailsListLabel = new JLabel("Data Info:");
         // Data Info
         JPanel dataInfoPanel = new JPanel();
@@ -140,7 +156,6 @@ public class IFastDockUI extends PlugInFrame {
 
         lowerPanel.add(dataListPanel);
         lowerPanel.add(dataDetailsPanel);
-   
 
         // Input Panel (Image Dimension Inputs)
         JPanel inputPanel = new JPanel();
@@ -190,9 +205,10 @@ public class IFastDockUI extends PlugInFrame {
         });
     }
 
+    // show record info details on click event
     public void OnDataListClick() {
         String selectedData = dataList.getSelectedValue();
-        int idx = dataList.getSelectedIndex();
+        int idx = dataList.getSelectedIndex() + 1;// data list is 0 base, data file in the fastdock is 1 base
         if (selectedData != null) {
             PDCRecordInfo recordInfo = getRecordInfo(idx);
             if (recordInfo != null) {
@@ -208,30 +224,20 @@ public class IFastDockUI extends PlugInFrame {
         }
     }
 
+    // show drive info details and update data list on click event
     public void OnDriveListClick() {
         String selectedDrive = driveList.getSelectedValue();
         int idx = driveList.getSelectedIndex();
         if (selectedDrive != null) {
-            int nNumOfData = openDrive(idx);
             driveNameLabel.setText("Selected Drive: " + selectedDrive);
             activityRatioLabel.setText("Activity Ratio: " + getActivityRatio());
             totalWrittenLabel.setText("Total Written Size: " + getTotalWrittenSize());
-
             dataListModel.clear();
-            for (int data_id = 1; data_id <= nNumOfData; ++data_id) {
-                /*
-                 * if (PDCLib.INSTANCE.PFDC_GetRecordInfo(i, recordInfo, nErrorCode) == 0) {
-                 * showMessage("Error", "Failed to get drive name. ErrorCode: " +
-                 * nErrorCode.getValue());
-                 * continue;
-                 * }
-                 * String dataName= recordInfo.m_pDataName;
-                 */
+            for (int data_id = 1; data_id <= m_nDataNumber; ++data_id) {
                 PDCRecordInfo recordInfo = getRecordInfo(data_id);
                 if (recordInfo != null) {
                     dataListModel.addElement(recordInfo.getRecordName());
                 }
-
             }
         }
     }
@@ -294,7 +300,6 @@ public class IFastDockUI extends PlugInFrame {
     }
 
     // Define the PDC_RECORD_INFO class as an inner class
-    // Define the Java structure equivalent to the C struct
     public static class PDCRecordInfo extends Structure {
         public static final int PDC_MAX_STRING_LENGTH = 256;
 
@@ -457,11 +462,7 @@ public class IFastDockUI extends PlugInFrame {
         }
     }
 
-    private IntByReference nErrorCode = new IntByReference(0);
-    private IntByReference nDrives = new IntByReference(0);
-    private IntByReference nNumOfData = new IntByReference(0);
-
-    public boolean initialize() {
+    public boolean initializeFastDock() {
         int result = PDCLib.INSTANCE.PDC_Init(nErrorCode);
         if (result == 0) {
             if (nErrorCode.getValue() == 7) {
@@ -555,149 +556,6 @@ public class IFastDockUI extends PlugInFrame {
         return recordInfo;
     }
 
-    private void displayRecordInfo(Pointer recordInfoPointer) {
-        // Retrieve and display individual fields from the struct
-        String dataName = recordInfoPointer.getString(0x100); // Example offset for `m_pDataName`
-        String deviceName = recordInfoPointer.getString(0x140); // Example offset for `m_DeviceName`
-        int infoVersion = recordInfoPointer.getShort(0x00); // Example offset for `m_nInfoVersion`
-        int sysVersion = recordInfoPointer.getShort(0x02); // Example offset for `m_nSysVersion`
-
-        // Example: Parse date and time fields
-        long date = recordInfoPointer.getInt(0x04); // Offset for `m_nDate`
-        int year = (int) ((date >> 16) & 0xFF);
-        int month = (int) ((date >> 8) & 0xFF);
-        int day = (int) (date & 0xFF);
-
-        long time = recordInfoPointer.getInt(0x08); // Offset for `m_nTime`
-        int hour = (int) ((time >> 16) & 0xFF);
-        int minute = (int) ((time >> 8) & 0xFF);
-        int second = (int) (time & 0xFF);
-
-        System.out.printf("Data Name             : %s%n", dataName);
-        System.out.printf("Device Name           : %s%n", deviceName);
-        System.out.printf("Info Version          : %d%n", infoVersion);
-        System.out.printf("Sys Version           : %d%n", sysVersion);
-        System.out.printf("Date                  : %02d/%02d/%02d%n", year, month, day);
-        System.out.printf("Time                  : %02d:%02d:%02d%n", hour, minute, second);
-
-        // Continue extracting other fields in a similar manner
-        // Use correct offsets for the specific field as per the struct layout
-    }
-
-    /*
-     * public void getRecordInfo(unsigned long dataNumber) {
-     * PDC_RECORD_INFO recordInfo;
-     * unsigned long nErrorCode;
-     * 
-     * if (PFDC_GetRecordInfo(dataNumber, &recordInfo, &nErrorCode) == PDC_FAILED) {
-     * printf("PFDC_GetRecordInfo() Failed for data %lu. ErrorCode = %lu\n",
-     * dataNumber, nErrorCode);
-     * return false;
-     * }
-     * 
-     * printf("Data Name             : %s\n", recordInfo.m_pDataName);
-     * printf("Device Name           : %s\n", recordInfo.m_DeviceName);
-     * printf("Info Version          : %u\n", recordInfo.m_nInfoVersion);
-     * printf("Sys Version           : %u\n", recordInfo.m_nSysVersion);
-     * printf("Date                  : %02x/%02x/%02x\n",
-     * (recordInfo.m_nDate >> 16) & 0xFF,
-     * (recordInfo.m_nDate >> 8) & 0xFF,
-     * recordInfo.m_nDate & 0xFF);
-     * printf("Time                  : %02x:%02x:%02x\n",
-     * (recordInfo.m_nTime >> 16) & 0xFF,
-     * (recordInfo.m_nTime >> 8) & 0xFF,
-     * recordInfo.m_nTime & 0xFF);
-     * printf("Camera Type           : %lu\n", recordInfo.m_nCameraType);
-     * printf("Head Type             : %u\n", recordInfo.m_nHeadType);
-     * printf("Head Number           : %u\n", recordInfo.m_nHeadNo);
-     * printf("Max Head Number       : %u\n", recordInfo.m_nMaxHeadNum);
-     * printf("Record Rate           : %lu fps\n", recordInfo.m_nRecordRate);
-     * printf("Shutter Speed         : 1/%lu sec\n", recordInfo.m_nShutterSpeed);
-     * printf("Trigger Mode          : %lu\n", recordInfo.m_nTriggerMode);
-     * printf("Manual Frames         : %lu\n", recordInfo.m_nManualFrames);
-     * printf("Random Frames         : %lu\n", recordInfo.m_nRandomFrames);
-     * printf("Random Manual Frames  : %lu\n", recordInfo.m_nRandomManualFrames);
-     * printf("Random Times          : %lu\n", recordInfo.m_nRandomTimes);
-     * printf("Two Stage Type        : %lu\n", recordInfo.m_nTwoStageType);
-     * printf("Two Stage LH Frame    : %lu\n", recordInfo.m_nTwoStageLHFrame);
-     * printf("Two Stage Cycle       : %lu\n", recordInfo.m_nTwoStageCycle);
-     * printf("Two Stage HL Frame    : %lu\n", recordInfo.m_nTwoStageHLFrame);
-     * printf("Color Temperature     : %u\n", recordInfo.m_nColorTemperature);
-     * printf("Color Balance (R, G, B) : %u, %u, %u\n", recordInfo.m_nColorBalanceR,
-     * recordInfo.m_nColorBalanceG, recordInfo.m_nColorBalanceB);
-     * printf("Color Balance Base    : %u\n", recordInfo.m_nColorBalanceBase);
-     * printf("Color Balance Max     : %u\n", recordInfo.m_nColorBalanceMax);
-     * printf("Original Total Frames : %lu\n", recordInfo.m_nOriginalTotalFrames);
-     * printf("Total Frames          : %lu\n", recordInfo.m_nTotalFrames);
-     * printf("Start Frame           : %ld\n", recordInfo.m_nStartFrame);
-     * printf("Trigger Frame         : %ld\n", recordInfo.m_nTriggerFrame);
-     * printf("Number of Events      : %lu\n", recordInfo.m_nNumOfEvent);
-     * 
-     * // Display events
-     * for (unsigned long i = 0; i < recordInfo.m_nNumOfEvent && i < 10; ++i) {
-     * printf("Event %lu               : %ld\n", i, recordInfo.m_nEvent[i]);
-     * }
-     * 
-     * printf("Resolution            : %dx%d\n", recordInfo.m_nWidth,
-     * recordInfo.m_nHeight);
-     * printf("Sensor Position (X, Y): %u, %u\n", recordInfo.m_nSensorPosX,
-     * recordInfo.m_nSensorPosY);
-     * printf("Sensor Size (Width x Height): %u x %u\n", recordInfo.m_nSensorWidth,
-     * recordInfo.m_nSensorHeight);
-     * printf("Color Type            : %u\n", recordInfo.m_nColorType);
-     * printf("Color Bits            : %u\n", recordInfo.m_nColorBits);
-     * printf("Effective Bit Depth   : %u\n", recordInfo.m_nEffectiveBitDepth);
-     * printf("Effective Bit Side    : %u\n", recordInfo.m_nEffectiveBitSide);
-     * printf("IRIG Mode             : %lu\n", recordInfo.m_nIRIGMode);
-     * printf("Shutter Type 2        : %lu\n", recordInfo.m_nShutterType2);
-     * 
-     * // Color Matrix (RR, RG, RB, GR, GG, GB, BR, BG, BB)
-     * printf("Color Matrix (RR, RG, RB, GR, GG, GB, BR, BG, BB): ");
-     * printf("%d, %d, %d, %d, %d, %d, %d, %d, %d\n",
-     * recordInfo.m_nColorMatrixRR, recordInfo.m_nColorMatrixRG,
-     * recordInfo.m_nColorMatrixRB,
-     * recordInfo.m_nColorMatrixGR, recordInfo.m_nColorMatrixGG,
-     * recordInfo.m_nColorMatrixGB,
-     * recordInfo.m_nColorMatrixBR, recordInfo.m_nColorMatrixBG,
-     * recordInfo.m_nColorMatrixBB);
-     * 
-     * printf("LUT Bits             : %u\n", recordInfo.m_nLUTBits);
-     * printf("Color Enhance        : %u\n", recordInfo.m_nColorEnhance);
-     * printf("Edge Enhance         : %u\n", recordInfo.m_nEdgeEnhance);
-     * printf("LUT Mode             : %lu\n", recordInfo.m_nLUTMode);
-     * printf("DS Shutter           : %u\n", recordInfo.m_nDSShutter);
-     * printf("Polarization         : %u\n", recordInfo.m_nPolarization);
-     * printf("Polarizer Config     : %u\n", recordInfo.m_nPolarizerConfig);
-     * printf("Digits of File Number: %u\n", recordInfo.m_nDigitsOfFileNumber);
-     * printf("Pixel Gain Base      : %u\n", recordInfo.m_nPixelGainBase);
-     * printf("Pixel Gain Bits      : %u\n", recordInfo.m_nPixelGainBits);
-     * printf("Shading Bits         : %u\n", recordInfo.m_nShadingBits);
-     * printf("Bayer Pattern        : %u\n", recordInfo.m_nBayerPattern);
-     * printf("Expose Time Number   : %u\n", recordInfo.m_nExposeTimeNum);
-     * printf("Rec On Cmd Times     : %u\n", recordInfo.m_nRecOnCmdTimes);
-     * printf("Pixel Gain Param     : %u\n", recordInfo.m_nPixelGainParam);
-     * printf("Reserve              : %u\n", recordInfo.m_nReserve);
-     * printf("Irig Sample          : %lu\n", recordInfo.m_IrigSample);
-     * printf("AE Exposure Time Mode: %lu\n",
-     * recordInfo.m_AEExposureTimeRecordMode);
-     * printf("AE Mode Set          : %u\n", recordInfo.m_AEModeSet);
-     * printf("DAQ Mode            : %u\n", recordInfo.m_nDAQMode);
-     * printf("DAQ Range            : [%lu, %lu]\n", recordInfo.m_nDAQRange[0],
-     * recordInfo.m_nDAQRange[1]);
-     * printf("Irig Offset          : %ld\n", recordInfo.m_IrigOffset);
-     * printf("Serial Number        : %llu\n", recordInfo.m_nSerialNumber);
-     * printf("Data Number          : %lu\n", recordInfo.m_nDataNumber);
-     * printf("Is Over Sync         : %lu\n", recordInfo.m_nIsOverSync);
-     * printf("External Others Mode : %u\n", recordInfo.m_nExtOthersMode);
-     * printf("Reserve 2            : %u\n", recordInfo.m_nReserve2);
-     * printf("Temperature Type     : %lu\n", recordInfo.m_nTemperatureType);
-     * printf("Acceleration Type    : %lu\n", recordInfo.m_nAccelerationType);
-     * printf("Pixel Gain Data Size : %lu\n", recordInfo.m_nPixelGainDataSize);
-     * 
-     * return true;
-     * }
-     */
-
     public void showVirtualStack(int dataNumber, int width, int height, int totalFrames) {
         // Parameters for the images
         int nPlanes = 1;
@@ -712,10 +570,6 @@ public class IFastDockUI extends PlugInFrame {
                 int frameIndex = n - 1; // Convert to 0-based index
                 // Fetch the image data for the current frame
                 PDCLib.INSTANCE.PFDC_GetImageData(dataNumber, frameIndex, nInterleave, pImageData, nErrorCode);
-                /// String message = String.format("getProcessor dataNumber: %d,frameIndex
-                /// %d,nErrorCode %s", dataNumber,frameIndex,nErrorCode.getValue());
-                // showMessage2( message);
-                // Convert Pointer to byte array
                 byte[] imageBytes = pImageData.getByteArray(0, imageSize);
                 short[] shortData = convertBytesToShorts(imageBytes);
                 ShortProcessor sp = new ShortProcessor(width, height);
@@ -743,7 +597,6 @@ public class IFastDockUI extends PlugInFrame {
         int imageSize = 512 * 512 * nPlanes * 2;
         Pointer pImageData = new Memory(imageSize);
         ImageStack stack = new ImageStack(width, height);
-        // Assume `totalFrames` represents the number of frames to fetch
         // Loop through each frame and fetch image data
         for (int i = 0; i < totalFrames; ++i) {
             PDCLib.INSTANCE.PFDC_GetImageData(dataNumber, i, nInterleave, pImageData, nErrorCode);
